@@ -78,10 +78,10 @@ Ftrace has many available tracers.
 ![alt text](images/avail_tracers.png)  
 ## function trace  
 ```bash
-sysctl kernel.ftrace_enabled=1
-echo function > /sys/kernel/debug/tracing/current_tracer
-echo 1 > /sys/kernel/debug/tracing/tracing_on
-cat /sys/kernel/debug/tracing/trace_pipe
+$ sysctl kernel.ftrace_enabled=1
+$ echo function > /sys/kernel/debug/tracing/current_tracer
+$ echo 1 > /sys/kernel/debug/tracing/tracing_on
+$ cat /sys/kernel/debug/tracing/trace_pipe
 ```
 ![alt text](images/ftrace_output.png)  
 After enable function trace for all functions, there will be many output.  
@@ -99,38 +99,38 @@ Commonly used files:
 ```
 ### filter sched* functions  
 ```bash
-echo nop > current_tracer
-echo 0 > tracing_on
-echo global > trace_clock
-echo 'sched*' > ./set_ftrace_filter
-echo function > current_tracer
-echo 1 > tracing_on
+$ echo nop > current_tracer
+$ echo 0 > tracing_on
+$ echo global > trace_clock
+$ echo 'sched*' > ./set_ftrace_filter
+$ echo function > current_tracer
+$ echo 1 > tracing_on
 ```
 ![alt text](images/ftrace_filter_sched_funcs.png)  
 ### trace_on/off/print stack  
 ```bash
-echo nop > current_tracer
-echo 0 > tracing_on
-echo 'schedule:traceon:1' >> ./set_ftrace_filter
-echo 'schedule_idle:traceoff:1' >> ./set_ftrace_filter
-echo 'schedule_idle:stacktrace:1' >> ./set_ftrace_filter
-echo function > current_tracer
-echo 1 > tracing_on
+$ echo nop > current_tracer
+$ echo 0 > tracing_on
+$ echo 'schedule:traceon:1' >> ./set_ftrace_filter
+$ echo 'schedule_idle:traceoff:1' >> ./set_ftrace_filter
+$ echo 'schedule_idle:stacktrace:1' >> ./set_ftrace_filter
+$ echo function > current_tracer
+$ echo 1 > tracing_on
 ```
 ![alt text](images/ftrace_on_off_stack.png)  
 
 ## function graph trace  
 ```bash
-echo nop > current_tracer
-echo 0 > tracing_on
-echo function_graph > ./current_tracer
-echo 1 > ./options/funcgraph-proc
-echo 1 > ./options/funcgraph-tail
-echo do_open > ./set_graph_function
-echo 1 > options/latency-format
-echo 1 > tracing_on
-sleep 1
-echo 0 > tracing_on
+$ echo nop > current_tracer
+$ echo 0 > tracing_on
+$ echo function_graph > ./current_tracer
+$ echo 1 > ./options/funcgraph-proc
+$ echo 1 > ./options/funcgraph-tail
+$ echo do_open > ./set_graph_function
+$ echo 1 > options/latency-format
+$ echo 1 > tracing_on
+$ sleep 1
+$ echo 0 > tracing_on
 ```
 ![alt text](images/ftrace_func_graph.png)  
 
@@ -138,26 +138,26 @@ We can reset ftrace to initial state via:
 https://github.com/brendangregg/perf-tools/blob/master/tools/reset-ftrace  
 ## event trace  
 ```bash
-echo nop > current_tracer
-echo 0 > tracing_on
-grep sched: available_events
-echo sched:* > set_event
-echo 1 > tracing_on
-sleep 1
-echo 0 > tracing_on
+$ echo nop > current_tracer
+$ echo 0 > tracing_on
+$ grep sched: available_events
+$ echo sched:* > set_event
+$ echo 1 > tracing_on
+$ sleep 1
+$ echo 0 > tracing_on
 ```
 ![alt text](images/ftrace_event_trace.png)
 ### argument as filter
 ```bash
-echo nop > current_tracer
-echo 0 > tracing_on
+$ echo nop > current_tracer
+$ echo 0 > tracing_on
 # ~ means substring match.
-echo 'prev_comm~"*sh*"' >> events/sched/sched_switch/filter
-echo 1 > events/sched/sched_switch/enable
-echo 1 > tracing_on
-Disable：
-echo 0 > events/sched/sched_switch/enable
-echo 0 > events/sched/sched_switch/filter
+$ echo 'prev_comm~"*sh*"' >> events/sched/sched_switch/filter
+$ echo 1 > events/sched/sched_switch/enable
+$ echo 1 > tracing_on
+# Disable：
+$ echo 0 > events/sched/sched_switch/enable
+$ echo 0 > events/sched/sched_switch/filter
 ```
 Parameter can refer to events/sched/sched_switch/format file.  
 ![alt text](images/ftrace_event_trace_filter.png)  
@@ -166,15 +166,15 @@ Output looks like:
 
 ## kprobe  
 ```bash
-echo 0 > tracing_on
-grep __tasklet_schedule /proc/kallsyms
-echo 'p:my_tasklet_schedule __tasklet_schedule state=+0x8($arg1):u64' >> kprobe_events
-cat kprobe_events
-echo 1 > events/kprobes/my_tasklet_schedule/enable
-echo 1 > tracing_on
-Disable:
-echo 0 > events/kprobes/my_tasklet_schedule/enable
-echo '-:my_tasklet_schedule’ > kprobe_events
+$ echo 0 > tracing_on
+$ grep __tasklet_schedule /proc/kallsyms
+$ echo 'p:my_tasklet_schedule __tasklet_schedule state=+0x8($arg1):u64' >> kprobe_events
+$ cat kprobe_events
+$ echo 1 > events/kprobes/my_tasklet_schedule/enable
+$ echo 1 > tracing_on
+# Disable:
+$ echo 0 > events/kprobes/my_tasklet_schedule/enable
+$ echo '-:my_tasklet_schedule’ > kprobe_events
 ```
 We can print according to function name and parameters, also we can print the value which has some offset to function parameter.  
 ![alt text](images/ftrace_kprobe_func_definition.png)  
@@ -183,7 +183,7 @@ output is:
 ![alt text](images/ftrace_kprobe_output.png)  
 ### kretprobe  
 ```bash
-echo 'r:my_open do_sys_open ret=$retval’ > kprobe_events
+$ echo 'r:my_open do_sys_open ret=$retval’ > kprobe_events
 ```
 
 ## ftrace filters  
@@ -200,7 +200,172 @@ When enable ftrace, there will be many output, we need to use filters to get wha
 | events/*/trigger                             | Allows set up filters for trigger. i.e. 'stacktrace if bytes_req<=1024'               |
 Kprobe events are same as normal events, can use similar filters.  
 
-# 6. oops debug  
+# 6. perf tool  
+perf tool is very useful for performance optimization.  
+## perf top  
+Simply see the top functions in that core or process.  
+```bash
+# check whole system
+$ perf top
+# only check this core
+$ perf top -C 1
+# only check this pid
+$ perf top -p $pid
+# only check this tid
+$ perf top -t $tid
+```
+We can always check perf help command with -h.  
+```bash
+# check help with -h
+$ perf $command -h
+```
+![alt text](images/perf_top.png)  
+## perf stat  
+We can use "perf stat" to see which function called most times.  
+![alt text](images/perf_stat.png)  
+## perf record & report  
+```bash
+# -e means event, cycles:k means kernel, :u means user space.
+$ perf record -e cycles:k -C 0
+$ perf record -e cycles:u -C 0
+# record "-F max" means use max frequency perf tool supports.
+# This command only records for test_command.
+$ perf record -F max -- $test_command
+# check reports.
+$ perf report
+```
+## perf trace  
+For example, we can trace page fault easily via perf trace.  
+```bash
+# trace "-F all" means all pagefaults, including major and minor.
+$ perf trace -F all -C 0-3
+```
+![alt text](images/perf_trace_all.png)  
+```bash
+# trace schedule events
+$ perf trace -e sched:*
+```
+![alt text](images/perf_trace_sched.png)  
+It is similar as ftrace's event trace.  
+## perf probe  
+We can dynamically add probe for perf, and use perf trace to see related events.  
+Trace kernel function:  
+```bash
+$ perf probe -V tcp_sendmsg  
+$ perf probe --add 'tcp_sendmsg size'
+$ perf record -e probe:tcp_sendmsg -aR sleep 1
+$ perf script
+# Or directly use
+$ perf trace -e probe:tcp_sendmsg -aR
+```
+Trace user function:  
+```
+$ perf probe -x /usr/lib/x86_64-linux-gnu/libc.so.6 --add malloc
+$ perf probe -x /usr/lib/x86_64-linux-gnu/libc.so.6 --add free
+$ perf record -e probe_libc:malloc -e probe_libc:free
+$ perf report -n
+$ perf script
+```
+![alt text](images/perf_probe_malloc.png)  
+Output will be like:  
+![alt text](images/perf_probe_malloc_free_output.png)  
+We can also use our custom libraries, and trace functions we implemented with similar command.  
+
+## perf PMU counters  
+Performance Monitoring Unit (PMU) counters are hardware registers which count specific types of micro-architectural events.  
+```bash
+$ perf stat -e r052/name=L2_miss/u -e r037/name=LLC_miss/u -e r066/name=Memory_read/u pstree
+```
+Here /u means only trace user space, we can also use /k to indicate trace kernel space. r052 is raw PMU events.  
+Output:  
+```bash
+ Performance counter stats for 'pstree':
+
+             32403      L2_miss                                                            
+              3936      LLC_miss                                                           
+           8625472      Memory_read                                                        
+
+       0.052379820 seconds time elapsed
+
+       0.018325000 seconds user
+       0.032193000 seconds sys
+```
+
+## perf flamegraph  
+Firstly download tools from repo: https://github.com/brendangregg/FlameGraph.git  
+```bash
+# Clone repo
+$ git clone git@github.com:brendangregg/FlameGraph.git
+# In target env
+$ perf record -F max --call-graph dwarf -a -g
+$ perf script > out.perf
+# In host env
+$ ./FlameGraph/stackcollapse-perf.pl out.perf > out.perf-folded
+$ ./FlameGraph/flamegraph.pl out.perf-folded > flamegraph-example.svg
+```
+![alt text](images/perf_flame_graph.png)  
+The Y-axis represents the call stack, with the upper positions indicating the most recently called functions.  
+The X-axis shows the sampling count; the wider a section, the more time it has consumed.  
+If there are plateaus (flat tops), it indicates a bottleneck.  
+
+# 7. ARM specific  
+## coresight  
+CoreSight is a hardware-based debug and trace technology in ARM processors that allows for detailed tracing of program execution.  
+Enable those flags in kernel:  
+```bash
+CONFIG_CORESIGHT=y
+CONFIG_CORESIGHT_LINKS_AND_SINKS=y
+CONFIG_CORESIGHT_SOURCE_ETM4X=y
+CONFIG_CORESIGHT_TMC=y
+CONFIG_CORESIGHT_TPIU=y
+CONFIG_CORESIGHT_SINK_TMC=y
+CONFIG_CORESIGHT_SINK_ETB=y
+CONFIG_CORESIGHT_SINK_ETF=y
+CONFIG_CORESIGHT_SINK_SF=y
+CONFIG_CORESIGHT_CATU=y
+```
+modprobe needed kernel modules, then capture via perf tool.  
+```bash
+$ perf record -e cs_etm/cycacc,timestamp,@tmc_etr0/ -p 1 -- sleep 10
+$ perf script -i perf.data --ns --header -F +comm,+pid,+tid,+cpu,+time,+ip,+sym,+dso,+addr,+symoff,+flags,+callindent
+```
+cs_etm: Stands for CoreSight Embedded Trace Macrocell, a component of ARM's CoreSight technology used for program flow tracing.  
+cycacc: A configuration option that enables cycle accurate tracing. This means the trace will include precise timing information about each instruction.  
+timestamp: A configuration option that includes timestamps in the trace data.  
+@tmc_etr0: Specifies the sink for the trace data. tmc_etr0 refers to a Trace Memory Controller (TMC) in Embedded Trace Router (ETR) mode, which is a CoreSight component responsible for collecting and storing trace data.  
+![alt text](images/coresight_trace.png)
+It is useful for analyzing performance data with high precision and understanding the sequence of function calls and events that occurred during the execution of a program.  
+We can also use coresight perf instruction tracing, which provides detailed information about the execution path of a program. This can be useful for identifying performance bottlenecks and understanding the behavior of applications at a very fine granularity.  
+## SPE (Statistical Profiling Etension)  
+SPE offers HW level of event tracing, which is similar as Intel PEBS and AMD IBS.  
+It need enable ARM_SPE_PMU config.  
+https://perf.wiki.kernel.org/index.php/Latest_Manual_Page_of_perf-arm-spe.1  
+Arm recommends that the minimum sampling interval is once per 1024 micro-operations. This value is communicated to software through PMSIDR_EL1.Interval, bits[11:8].  
+![alt text](images/spe_with_perf_tool.png)
+ARM SPE is supported in 5.14 kernel.  
+Memory events are not supported by ARM cores, so we need ARM SPE for memory profiling on ARM platforms.  
+```bash
+$ perf record -d -e arm_spe_0/ts_enable=1,load_filter=1,store_filter=0,min_latency=400/ ls
+$ perf report --mem-mode
+```
+![alt text](images/spe_mem_mode.png)  
+### Check branch miss  
+```bash
+$ perf record -e arm_spe/branch_filter=1/ -c 1000 ls
+```
+branch miss info：  
+![alt text](images/spe_branch_misses.png)  
+
+### Check high latency events  
+Lower than min_latency events will be discarded.  
+Only record when exceed 600 clock cycles. Every 1000 samples will take one.  
+```bash
+$ perf record -e arm_spe/min_latency=600/ -c 1000 ls
+$ perf report --mem-mode
+```
+![alt text](images/spe_high_latency_events.png)  
+
+# 8. oops debug  
 Take example from kernel Bugzilla: 217198 – ath11k: kernel panics on rmmod: https://bugzilla.kernel.org/show_bug.cgi?id=217198  
 pc (program counter): function name + offset/length.  
 lr(link register): function name + offset/length.  
@@ -223,7 +388,7 @@ Another way is we can use “gdb vmlinux.elf” and call “x/20i *schedule+offs
 ![alt text](images/addr2line_output.png)
 If we don’t have vmlinux.elf, we can generate it via:  
 ```bash
-vmlinux-to-elf vmlinux vmlinux.elf
+$ vmlinux-to-elf vmlinux vmlinux.elf
 ```
 [marin-m/vmlinux-to-elf: A tool to recover a fully analyzable .ELF from a raw kernel, through extracting the kernel symbol table (kallsyms) (github.com)](https://github.com/marin-m/vmlinux-to-elf)
 ![alt text](images/ftrace_oops_common_reasons.png)  
@@ -254,7 +419,7 @@ Enable CONFIG_DEBUG_PAGE_ALLOC, kernel will unmap pages from the kernel linear m
 3. DMA debugging  
 Enable CONFIG_DMA_API_DEBUG, kernel will be able to detect common bugs in device drivers like double-freeing of DMA mappings or freeing mappings that were never allocated.  
 
-# 7. hang debug  
+# 9. hang debug  
 The simple way check top command.  
 [top(1) - Linux manual page (man7.org)](https://man7.org/linux/man-pages/man1/top.1.html)  
 Can check man top, mostly with:  
@@ -283,7 +448,7 @@ After enable lock stat, we can also check each lock's details.
 ## irqsoff tracer  
 Can enable irqsoff tracer via:  
 ```bash
-echo irqsoff > current_tracer
+$ echo irqsoff > current_tracer
 ```
 ![alt text](images/irqsoff_tracers.png)  
 We can see the details, in this case, it is hardirq, we can see what functions are calling there, caused hang.  
@@ -291,12 +456,15 @@ We can see the details, in this case, it is hardirq, we can see what functions a
 Similarly we can also enable preemptoff tracer, or preemptirqoff tracer, to see what happens.  
 ![alt text](images/irqsoff_latency_tracer.png)
 
-# 8. security related  
+# 10. security related  
 Linux kernel defence map has many debug methods for security issues.  
 https://github.com/a13xp0p0v/linux-kernel-defence-map/blob/master/linux-kernel-defence-map.svg  
 ![alt text](images/security_debug_flags.png)  
 
-# References  
+# 11. References  
 Linux Kernel Debugging -- https://github.com/PacktPublishing/Linux-Kernel-Debugging  
 https://www.kernel.org/doc/html/latest/dev-tools/kasan.html  
 https://linux-kernel-labs.github.io/refs/heads/master/lectures/debugging-slides.html#27.  
+https://developer.arm.com/documentation/101816/0708/Capture-a-Streamline-profile/Counter-Configuration/Configure-SPE-counters  
+https://github.com/AmpereComputing/ampere-lts-kernel/wiki/enable-perf-arm_spe  
+https://static.linaro.org/connect/lvc21/presentations/lvc21-302.pdf  

@@ -62,6 +62,7 @@ Each cpu will pop tasks from it's run queue.
 RT schedule class’s schedule entity (se) is sched_rt_entity, can be FIFO or RR schedule policy tasks, they are chained together via linked list by different priority array.  
 High priority can preempt low priority.  
 Time complexity is O(1).  
+Normally /proc/sys/kernel/sched_rt_runtime_us value is 950000 (0.95s, sched_rt_period_us is usually equal to 1s), if update to -1, it might cause rt process cost too much CPUs, and SCHED_NORMAL process can't get scheduled.  
 
 ### Fair schedule class  
 Currently we are using CFS (Completely Fair Scheduler) for fair schedule class.  

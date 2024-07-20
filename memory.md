@@ -171,7 +171,79 @@ Overwrite: Can use mprotect() to protect that page after write, and when others 
 Kernel mem leak: we can use kmemleak tool or config option.  
 User mem leak: can check VSS/RSS/PSS/USS via smem tool collection.  
 
-# 7. References  
+# 7. Optimization   
+## ARM MPAM   
+ARM MPAM (Memory Partitioning and Monitoring) can help ensure that each core has access to the necessary resources without interference from other cores.   
+Need enable CONFIG_ARM64_MPAM=y firstly.   
+```bash
+# Mount resctl
+$ mount -t resctrl resctrl /sys/fs/resctrl/
+# Create new partition
+$ mkdir test1
+$ tree /sys/fs/resctrl/
+.
+|-- cpus
+|-- cpus_list
+|-- id
+|-- info
+|   |-- L3
+|   |   |-- bit_usage
+|   |   |-- cbm_mask
+|   |   |-- min_cbm_bits
+|   |   |-- num_closids
+|   |   `-- shareable_bits
+|   |-- MB
+|   |   |-- bandwidth_gran
+|   |   |-- delay_linear
+|   |   |-- min_bandwidth
+|   |   `-- num_closids
+|   `-- last_cmd_status
+|-- mode
+|-- schemata
+|-- size
+|-- tasks
+`-- test1
+    |-- cpus
+    |-- cpus_list
+    |-- id
+    |-- mode
+    |-- schemata
+    |-- size
+    `-- tasks
+
+# Set schemata
+# For LLC MPAM, fe means 4+3 cache ways assign to this parition.
+$ echo "L3:0=fe" > test1/schemata
+$ cat test1/schemata
+#MB:0=0097
+L3:0=00fe
+
+# Restrict test1 partition to only use cores 0 and 4.
+$ echo "11" > test1/cpus
+$ cat test1/cpus_list
+0,4
+```
+ARM MPAM is similar as Intel RDT, differences are:    
+| Types                                                                          | intel rdt | arm mpam |
+|--------------------------------------------------------------------------------|-----------|----------|
+| closids(Class of Service IDs)                                                  | 16        | 16       |
+| rmids(Resource Monitoring IDs)                                                 | 192       | 4        |
+| L3                                                                             | Yes       | Yes      |
+| cdpL3(Cache Data Partitioning at L3)                                           | Yes       | Yes      |
+| cdpl2(Cache Data Partitioning at L2)                                           | Yes       | No       |
+| MB(bandwidth_gran, size of the memory bandwidth allocation for each partition) | 10%       | 2%       |
+| MB(min_bandwidth, minimum allocated memory bandwidth for a partition)          | 10%       | 2%       |
+| user tools                                                                     | pcm       | No       |
+| iommu                                                                          | No        | Yes      |
+| resource usage report                                                          | register  | ACPI     |
+
+
+## Hugepage   
+Hugepage can significantly improve performance, because each page needs a TLB entry, if not in TLB, then it will cause an TLB miss.  
+With 2MB or 1GB TLB, each page can cover more areas, so have fewer TLB misses.  i.e. 2MB page TLB miss might be 511 times less than normal 4kB page.  
+Also modern CPUs usually have separate huge-TLB, beside normal TLB, which won't conflict with other TLBs.  
+
+# 8. References  
 https://lbomr.xetlk.com/s/4Ah3Md  
 https://github.com/BiscuitOS/BiscuitOS  
 https://www.kernel.org/doc/Documentation/sysctl/vm.txt  
