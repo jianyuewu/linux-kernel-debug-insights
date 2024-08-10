@@ -18,6 +18,41 @@ to replace with original two lines of code:
 dev_err(&dummy_device, "No mem.\n");  
 return –NOMEM;  
 ```
+For pr_dbg()/dev_dbg()/print_hex_dump_debug()/print_hex_dump_bytes(), we can also use dynamic debug to enable those prints. Need enable CONFIG_DYNAMIC_DEBUG option firstly.  
+```bash
+$ head /sys/kernel/debug/dynamic_debug/control
+# filename:lineno [module]function flags format
+init/main.c:857 [main]initcall_blacklisted =p "initcall %s blacklisted\012"
+init/main.c:818 [main]initcall_blacklist =p "blacklisting initcall %s\012"
+init/initramfs.c:477 [initramfs]unpack_to_rootfs =_ "Detected %s compressed data\012"
+arch/x86/events/amd/ibs.c:915 [ibs]force_ibs_eilvt_setup =_ "No EILVT entry available\012"
+arch/x86/events/amd/ibs.c:886 [ibs]setup_ibs_ctl =_ "No CPU node configured for IBS\012"
+arch/x86/events/amd/ibs.c:879 [ibs]setup_ibs_ctl =_ "Failed to setup IBS LVT offset, IBSCTL = 0x%08x\012"
+arch/x86/events/intel/pt.c:755 [pt]pt_topa_dump =_ "# entry @%p (%lx sz %u %c%c%c) raw=%16llx\012"
+arch/x86/events/intel/pt.c:752 [pt]pt_topa_dump =_ "# table @%p, off %llx size %zx\012"
+arch/x86/kernel/tboot.c:85 [tboot]tboot_probe =_ "tboot_size: 0x%x\012"
+```
+Most commonly used keywords are func, file, line, module, flags. For example:  
+```bash
+echo 'file svcsock.c line 1603 +pmf' > /sys/kernel/debug/dynamic_debug/control
+echo 'module test* +p' > /sys/kernel/debug/dynamic_debug/control
+```
+The flags are:  
+```bash
+-    remove the given flags
++    add the given flags
+=    set the flags to the given flags
+
+    p    enables the pr_debug() callsite.
+    _    enables no flags.
+
+        Decorator flags add to the message-prefix, in order:
+            t    Include thread ID, or <intr>
+            m    Include module name
+            f    Include the function name
+            s    Include the source file name
+            l    Include line number
+```
 
 # 2. BUG_ON(), WARN_ON_ONCE(), dump_stack()  
 BUG_ON(condition); Will call BUG(), and panic().  
@@ -383,7 +418,7 @@ $ objdump -dSl vmlinux.elf > output.log
 -d, --disassemble show disassemble code.  
 -S, --source indicates including source code.  
 -l, --line-numbers represents file and line numbers.  
-Another way is we can use “gdb vmlinux.elf” and call “x/20i *schedule+offset” command to decode it.
+Another way is we can use "gdb vmlinux.elf" and call "x/20i *schedule+offset" command to decode it.
 ![alt text](images/gdb_vmlinux.png)
 ![alt text](images/addr2line_output.png)
 If we don’t have vmlinux.elf, we can generate it via:  
@@ -392,6 +427,12 @@ $ vmlinux-to-elf vmlinux vmlinux.elf
 ```
 [marin-m/vmlinux-to-elf: A tool to recover a fully analyzable .ELF from a raw kernel, through extracting the kernel symbol table (kallsyms) (github.com)](https://github.com/marin-m/vmlinux-to-elf)
 ![alt text](images/ftrace_oops_common_reasons.png)  
+We can also use script decode_stacktrace.sh in linux kernel repo, to parse it.  
+Before:  
+![alt text](images/stacktrace_before.png)  
+After:  
+![alt text](images/stacktrace_after.png)  
+We can see that file and line is added.  
 ## oops common reasons  
 Usually oops is caused by invalid memory access. For example:
 1. Uninitialized Memory Read  
@@ -468,3 +509,4 @@ https://linux-kernel-labs.github.io/refs/heads/master/lectures/debugging-slides.
 https://developer.arm.com/documentation/101816/0708/Capture-a-Streamline-profile/Counter-Configuration/Configure-SPE-counters  
 https://github.com/AmpereComputing/ampere-lts-kernel/wiki/enable-perf-arm_spe  
 https://static.linaro.org/connect/lvc21/presentations/lvc21-302.pdf  
+https://www.kernel.org/doc/html/latest/admin-guide/dynamic-debug-howto.html  

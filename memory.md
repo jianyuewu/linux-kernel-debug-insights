@@ -137,14 +137,40 @@ For better performance, usually we disable swap by swapoff -a.
 Performance is better than swap, as it can be compressed in RAM, and no need to do disk IO.  
 Page will be compressed, and stored in ZSWAP pool's zswap entry. There are special allocators like zsmalloc, zbud, z3fold.  
 6. Reclaim  
+Reclamation in the Linux kernel refers to the process of freeing up memory that is currently in use. This is generally performed by the page reclaim algorithm, which is a part of the kernel's memory management subsystem. The steps typically include:  
+Swapping out: Pages that are not actively in use can be moved to the swap area on the disk.  
+Evicting pages from the file cache: Unused or less frequently used file caches can be cleared, freeing up the memory they were occupying.  
+Clearing out slab caches: These are caches used by kernel objects; reclaiming these can also free up memory.  
 a. There is watermark for reclaim usage, if free pages < WMARK_HIGH, hysteric's field low_on_memory will be set, until free pages become WMARK_HIGH, when low_on_memory is set, allocator will free some mem if GFP_WAIT is set.  
 b. LRU lists. There are lruvec used for storing the pages, which belongs to active/inactive anon/file, when __alloc_pages_nodemaks() is called, it can start page reclaim, directly by APIs like shrink_active_list() or kswapd thread. Inactive pages will be firstly reclaimed.  
-![alt text](images/lru_list.png)
+![alt text](images/lru_list.png)  
 c. Zone ref lists. In NUMA env, there are many zones can be used, and if higher zone is used up, can use lower zones (NORMAL used up -> use lower DMA32 zone). After mem is freed, reclaim will do its job.  
-7. Hugepage  
+```bash
+$ sctl vm.min_free_kbytes 
+vm.min_free_kbytes = 67584
+```
+vm.min_free_kbytes will impact reclaim. Note if vm.min_free_kbytes is too small for it to run, then it locks up the system. This is because this interrupt process must run first to free memory so others can run, but then it's stuck because it doesn't have enough reserved memory vm.min_free_kbytes to do its task resulting in a deadlock.  
+```bash
+$ cat /proc/sys/vm/zone_reclaim_mode
+0
+```
+zone_reclaim_mode value 0 means no zone reclaim occurs. 1 means Zone reclaim on. 2 means reclaim writes dirty pages out. 4 means reclaim swaps pages.  
+![alt text](images/vmstat_related_params.png)  
+We can check /proc/vmstat to see page reclaim related parameters.  
+
+7. Compact  
+Compact deals with memory fragmentation.  
+```bash
+/sys/kernel/debug/tracing# echo 1 > events/compaction/enable 
+```
+Firstly, it divides memory into page blocks, a group of pages like 2 MB in a system with 4 KB pages.  
+Then, it migrates pages based on its type, like anon pages, file-backed pages, excluding those locked pages.  
+If some pages can't be moved, it will skip that page.  
+
+8. Hugepage  
 There are 2 kinds of hugepages normally, one is hugeTLB fs, and another is Transparent HugePage.
 THP will migrate scattered 4k pages to 2M pages, so performance is worse than normal hugepage.  
-Normal hugepage can be reserved in manually via: 
+Normal hugepage can be reserved in manually via:  
 ```bash
 # Reserve 6G hugepages.  
 echo 6 > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages   
@@ -157,14 +183,17 @@ echo "madvise" > /sys/kernel/mm/transparent_hugepage/enabled
 echo "never" > /sys/kernel/mm/transparent_hugepage/enabled  
 ```
 The main difference is that the Transparent HugePages are set up dynamically at run time by the khugepaged thread in kernel while the regular HugePages had to be preallocated at the boot up time.  
+
 9. Per cpu variables  
 Per cpu variables don't need extra synchronizations, so it is fast for use.  
 DEFINE_PER_CPU(type, var)  
 get_cpu_var(var);  
 put_cpu_var(var);  
+
 10. Useful device nodes  
 Those nodes are useful for debug, like /dev/mem and also kmem, null, port, zero, random, urandom, kmsg.  
 i.e. we can read kernel physical mem via /dev/mem, and create a zeroed file by dd from /dev/zero, also output to /dev/null.  
+
 # 6. Debug  
 OOM: Usually there are OOM logs, we can check which file/anon and each zone's free mem.  Also can check /proc/meminfo for Buffers, Cached, Shmem (Shmem and tmpfs), slab, vmallocused, usages.  
 Overwrite: Can use mprotect() to protect that page after write, and when others write it, it will trigger crash, so we can know who did that.  
@@ -237,11 +266,25 @@ ARM MPAM is similar as Intel RDT, differences are:
 | iommu                                                                          | No        | Yes      |
 | resource usage report                                                          | register  | ACPI     |
 
-
-## Hugepage   
+## Hugepage  
+### SHP (Static hugepage)  
 Hugepage can significantly improve performance, because each page needs a TLB entry, if not in TLB, then it will cause an TLB miss.  
 With 2MB or 1GB TLB, each page can cover more areas, so have fewer TLB misses.  i.e. 2MB page TLB miss might be 511 times less than normal 4kB page.  
 Also modern CPUs usually have separate huge-TLB, beside normal TLB, which won't conflict with other TLBs.  
+### THP (Transparent hugepage)  
+We can also enable THP, prefered option is madvice, so only those memory marked via madvice() API with MADV_HUGEPAGE will put to THP.  
+Because THP need to combine 4k pages to 2M in runtime, so it is still slower than SHP.  
+![alt text](images/SHPvsTHP.png)  
+
+## mlock pages  
+We can mlock pages for code section and other needed sections, so it won't be reclaimed. This ensures that the memory is always physically present in RAM when accessed.  
+mlock() API with flag MLOCK_ONFAULT is preferred, which locked only when they are accessed (faulted in), rather than immediately. This approach prevents the unnecessary reservation of physical RAM for memory areas that might not be needed immediately or at all.  
+We can check Mlocked field in /proc/meminfo, to see how much memory is mlocked.  
+```bash
+$grep -iE "unevictable|mlock" /proc/meminfo 
+Unevictable:       18472 kB
+Mlocked:           18472 kB
+```
 
 # 8. References  
 https://lbomr.xetlk.com/s/4Ah3Md  
@@ -251,3 +294,5 @@ https://www.kernel.org/doc/html/latest/core-api/wrappers/atomic_t.html
 https://dl.acm.org/doi/pdf/10.1145/3342195.3387517  
 https://storage.googleapis.com/pub-tools-public-publication-data/pdf/43438.pdf  
 https://cloud.tencent.com/developer/article/1821725  
+https://stackoverflow.com/questions/21374491/  
+https://time.geekbang.org/column/intro/100058001  
