@@ -114,29 +114,40 @@ Page -> address_space -> vma, when it is file mapping (mapped by VMA -> file -> 
 
 # 5. MISCs  
 1. Kernel space setup  
+
 kernel will start from 0x7c00 in old config, while in new config, it can start from 0x100000 or other addr.  
 Will load kernel image, and map sections like .data, .text, .bss and .__start.  
 Then create linear mapping, vmalloc area and others.  
+
 2. User space setup  
+
 After create user process/ thread, each thread will have a task_struct, and points to mm_struct, there is pgd points to page table, and there are several vmas used for different mapping areas.  
 When using user space mem, there are several ways, like Pre Alloc (VA + PA + PageTable), Lazy Alloc (VA) and On-Deman Alloc (VA, on-demand alloc PA + PageTable).  
 For malloc() API, there are 2 sizes, > 128kB, it uses mmap(), < 128kB, it uses brk() API.  
+
 3. Copy On Write  
+
 After fork, child process will have the resources owned by the parent, i.e. signal, open files, addr space. Resources are controlled via clone() flags, like CLONE_VM/FS/FILES/SIGHAND.  
 Parent process's page table is marked as read only, and child process's page table is also read only. They have separate page tables, but map to same PA addr space. Because they share same vma mapping, so read can get same data. If child process write to the page, then page fault will be triggered, and new page allocated, parent's page data will be copied to child.  
 When page is not mapped, there will be a page fault triggered, and handle_mm_fault() is called, then it will alloc pages from buddy allocator, and create page table accordingly.  
 ![alt text](images/cow_right_after_fork.png)  
 When parent or child write to the page, a page fault will be triggered, the page will be copied, and page table is updated.  
 ![alt text](images/cow_write_trigger_copy.png)  
+
 4. SWAP  
+
 For anonymous mem, page table will store swap entry.  
 For file mapped, or shared mem, swap entry will be stored in XARRAY, vma -> file -> inode -> address_space.  
 Swap space contains swap entry, and physical pages can be recycled.  
 For better performance, usually we disable swap by swapoff -a.  
+
 5. ZSWAP  
+
 Performance is better than swap, as it can be compressed in RAM, and no need to do disk IO.  
 Page will be compressed, and stored in ZSWAP pool's zswap entry. There are special allocators like zsmalloc, zbud, z3fold.  
+
 6. Reclaim  
+
 Reclamation in the Linux kernel refers to the process of freeing up memory that is currently in use. This is generally performed by the page reclaim algorithm, which is a part of the kernel's memory management subsystem. The steps typically include:  
 Swapping out: Pages that are not actively in use can be moved to the swap area on the disk.  
 Evicting pages from the file cache: Unused or less frequently used file caches can be cleared, freeing up the memory they were occupying.  
@@ -154,11 +165,12 @@ vm.min_free_kbytes will impact reclaim. Note if vm.min_free_kbytes is too small 
 $ cat /proc/sys/vm/zone_reclaim_mode
 0
 ```
-zone_reclaim_mode value 0 means no zone reclaim occurs. 1 means Zone reclaim on. 2 means reclaim writes dirty pages out. 4 means reclaim swaps pages.  
+zone_reclaim_mode value 0 means no zone reclaim occurs. 1 means Zone reclaim on, in local node. 2 means reclaim writes dirty pages out. 4 means reclaim swaps pages.  
 ![alt text](images/vmstat_related_params.png)  
 We can check /proc/vmstat to see page reclaim related parameters.  
 
 7. Compact  
+
 Compact deals with memory fragmentation.  
 ```bash
 /sys/kernel/debug/tracing# echo 1 > events/compaction/enable 
@@ -168,13 +180,21 @@ Then, it migrates pages based on its type, like anon pages, file-backed pages, e
 If some pages can't be moved, it will skip that page.  
 
 8. Hugepage  
-There are 2 kinds of hugepages normally, one is hugeTLB fs, and another is Transparent HugePage.
-THP will migrate scattered 4k pages to 2M pages, so performance is worse than normal hugepage.  
-Normal hugepage can be reserved in manually via:  
+
+There are 2 kinds of hugepages normally, one is hugeTLB fs, and another is Transparent HugePage.  
+Hugepage can significantly improve performance, because each page needs a TLB entry, if not in TLB, then it will cause an TLB miss.  
+With 2MB or 1GB TLB, each page can cover more areas, so have fewer TLB misses.  i.e. 2MB page TLB miss might be 511 times less than normal 4kB page.  
+Also modern CPUs usually have separate huge-TLB, beside normal TLB, which won't conflict with other TLBs.  
+**SHP (Static hugepage)**  
+Static hugepage can be reserved in manually via:  
 ```bash
 # Reserve 6G hugepages.  
-echo 6 > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages   
+echo 6 > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages  
 ```
+
+**THP (Transparent hugepage)**  
+We can also enable THP, prefered option is madvice, so only those memory marked via madvice() API with MADV_HUGEPAGE will put to THP.  
+THP will migrate scattered 4k pages to 2M pages, so performance is worse than normal hugepage.  
 THP can be used via:  
 ```bash
 # Enable  
@@ -183,6 +203,8 @@ echo "madvise" > /sys/kernel/mm/transparent_hugepage/enabled
 echo "never" > /sys/kernel/mm/transparent_hugepage/enabled  
 ```
 The main difference is that the Transparent HugePages are set up dynamically at run time by the khugepaged thread in kernel while the regular HugePages had to be preallocated at the boot up time.  
+Because THP need to combine 4k pages to 2M in runtime, so it is still slower than SHP.  
+![alt text](images/SHPvsTHP.png)  
 
 9. Per cpu variables  
 Per cpu variables don't need extra synchronizations, so it is fast for use.  
@@ -265,16 +287,6 @@ ARM MPAM is similar as Intel RDT, differences are:
 | user tools                                                                     | pcm       | No       |
 | iommu                                                                          | No        | Yes      |
 | resource usage report                                                          | register  | ACPI     |
-
-## Hugepage  
-### SHP (Static hugepage)  
-Hugepage can significantly improve performance, because each page needs a TLB entry, if not in TLB, then it will cause an TLB miss.  
-With 2MB or 1GB TLB, each page can cover more areas, so have fewer TLB misses.  i.e. 2MB page TLB miss might be 511 times less than normal 4kB page.  
-Also modern CPUs usually have separate huge-TLB, beside normal TLB, which won't conflict with other TLBs.  
-### THP (Transparent hugepage)  
-We can also enable THP, prefered option is madvice, so only those memory marked via madvice() API with MADV_HUGEPAGE will put to THP.  
-Because THP need to combine 4k pages to 2M in runtime, so it is still slower than SHP.  
-![alt text](images/SHPvsTHP.png)  
 
 ## mlock pages  
 We can mlock pages for code section and other needed sections, so it won't be reclaimed. This ensures that the memory is always physically present in RAM when accessed.  

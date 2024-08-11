@@ -439,13 +439,6 @@ Usually oops is caused by invalid memory access. For example:
 2. Out Of Bounds  
 3. Use After Free  
 
-## KSAN  
-KASAN (Kernel Address Sanitizer)  
-To enable KASAN, configure the kernel with: CONFIG_KASAN=y, and choose CONFIG_KASAN_HW_TAGS. It is the mode intended to be used as an in-field memory bug detector or as a security mitigation. This mode only works on arm64 CPUs that support MTE (Memory Tagging Extension), but it has low memory and performance overheads and thus can be used in production.  
-![alt text](images/kasan_areas.png)  
-![alt text](images/ksan_detected_errors.png)  
-https://www.kernel.org/doc/html/latest/dev-tools/kasan.html  
-
 ## Slub debug  
 To enable slub debug, set slub_debug in /proc/cmdline or CONFIG_SLUB_DEBUG_ON.  
 i.e. slub_debug=F,dentry  
@@ -495,9 +488,57 @@ $ echo irqsoff > current_tracer
 We can see the details, in this case, it is hardirq, we can see what functions are calling there, caused hang.  
 ![alt text](images/irqsoff_output.png)  
 Similarly we can also enable preemptoff tracer, or preemptirqoff tracer, to see what happens.  
-![alt text](images/irqsoff_latency_tracer.png)
+![alt text](images/irqsoff_latency_tracer.png)  
 
-# 10. security related  
+# 10. Sanitizers
+## KASAN  
+KASAN (Kernel Address Sanitizer)  
+To enable KASAN, configure the kernel with: CONFIG_KASAN=y, and choose CONFIG_KASAN_HW_TAGS. It is the mode intended to be used as an in-field memory bug detector or as a security mitigation. This mode only works on arm64 CPUs that support MTE (Memory Tagging Extension), but it has low memory and performance overheads and thus can be used in production.  
+![alt text](images/kasan_areas.png)  
+Sample log:  
+![alt text](images/ksan_detected_errors.png)  
+ARM64 also has HW-Tag Based KASAN, it has lower overhead, and requires the Memory Tagging Extension (MTE).  
+
+## KFENCE
+Kernel Electric-Fence is a low-overhead sampling-based memory safety error detector.  
+Note that kfence designed to be enabled in production kernels, and has near zero performance overhead.  
+Enable via:  
+```bash
+CONFIG_KFENCE=y
+```
+Sample log:  
+![alt text](images/kfence.png)  
+
+## KCSAN  
+Kernel Concurrency Sanitizer is a dynamic race detector, uses a watchpoint-based sampling approach to detect race conditions.  
+Enable via:  
+```bash
+CONFIG_KCSAN = y
+```
+Sample log:  
+![alt text](images/kcsan.png)  
+
+## KMSAN  
+Kernel Memory Sanitizer aimed at finding uses of uninitialilzed values.  
+Build need clang tool and enable configs.  
+```bash
+CONFIG_KMSAN = y
+CONFIG_KCOV = y
+```
+Sample log:  
+![alt text](images/kmsan.png)  
+
+## UBSAN
+UBSAN uses compile-time instrumentation to catch undefined behavior.  
+Enable via:  
+```bash
+CONFIG_UBSAN=y
+```
+Sample log:  
+![alt text](images/ubsan.png)
+We also have other sanitizers like KTSAN, details can see: https://github.com/google/kernel-sanitizers  
+
+# 11. security related  
 Linux kernel defence map has many debug methods for security issues.  
 https://github.com/a13xp0p0v/linux-kernel-defence-map/blob/master/linux-kernel-defence-map.svg  
 ![alt text](images/security_debug_flags.png)  
@@ -510,3 +551,8 @@ https://developer.arm.com/documentation/101816/0708/Capture-a-Streamline-profile
 https://github.com/AmpereComputing/ampere-lts-kernel/wiki/enable-perf-arm_spe  
 https://static.linaro.org/connect/lvc21/presentations/lvc21-302.pdf  
 https://www.kernel.org/doc/html/latest/admin-guide/dynamic-debug-howto.html  
+https://www.kernel.org/doc/html/latest/dev-tools/kasan.html  
+https://www.kernel.org/doc/html/latest/dev-tools/kfence.html  
+https://www.kernel.org/doc/html/latest/dev-tools/kmsan.html  
+https://www.kernel.org/doc/html/latest/dev-tools/ubsan.html  
+https://docs.google.com/presentation/d/1OsihHNut6E26ACTnT-GplQrdJuByRPNqUmN0HkqurIM/edit#slide=id.gcb7d49e8e_0_53  
