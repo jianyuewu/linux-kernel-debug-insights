@@ -218,7 +218,7 @@ output is:
 ![alt text](images/ftrace_kprobe_output.png)  
 ### kretprobe  
 ```bash
-$ echo 'r:my_open do_sys_open ret=$retval’ > kprobe_events
+$ echo 'r:my_open do_sys_open ret=$retval' > kprobe_events
 ```
 
 ## ftrace filters  
@@ -280,7 +280,7 @@ $ perf trace -F all -C 0-3
 # trace schedule events
 $ perf trace -e sched:*
 ```
-![alt text](images/perf_trace_sched.png)  
+![alt text](images/perf_trace_sched.png)    
 It is similar as ftrace's event trace.  
 ## perf probe  
 We can dynamically add probe for perf, and use perf trace to see related events.  
@@ -410,8 +410,60 @@ CPU:9, PID: 1181, comm: rmmod, Not tainted, kernel version 5.15.5, git hash is g
 Call trace: stack trace of that CPU.  
 ![alt text](images/ftrace_oops_debug_output.png)  
 
-## gdb, objdump and addr2line  
-Take schedule function as an example, we can use objdump, gdb, and addr2line to parse:  
+## crash, gdb, objdump and addr2line
+We can use crash, objdump, gdb, and addr2line to parse:  
+```bash
+$ crash vmlinux /var/crash/$TIMESTAMP/dump.$TIMESTAMP  
+# Check backtrace.  
+crash> foreach bt  
+crash> bt  
+PID: 509    TASK: ffff000006a5ea00  CPU: 0   COMMAND: "bash"  
+ #0 [ffff0000069ff760] crash_setup_regs at ffff8000102217b0  
+ #1 [ffff0000069ff790] __crash_kexec at ffff80001022387c  
+ #2 [ffff0000069ff910] panic at ffff800010078fe4  
+ #3 [ffff0000069ffa40] sysrq_handle_crash at ffff800010b40034  
+ #4 [ffff0000069ffa60] __handle_sysrq at ffff800010b40870  
+ #5 [ffff0000069ffaa0] write_sysrq_trigger at ffff800010b418c8
+# slabinfo  
+crash> kmem -S  
+# Slab mem leak info, including leak source.  
+crash> kmem -i  
+# Slab idle and active objects.  
+crash> kmem -o  
+crash> runq  
+CPU 0 RUNQUEUE: ffff00003fd77940  
+  CURRENT: PID: 509    TASK: ffff000006a5ea00  COMMAND: "bash"  
+  RT PRIO_ARRAY: ffff00003fd77b80  
+     [no tasks queued]  
+  CFS RB_ROOT: ffff00003fd779f0  
+     [no tasks queued]
+# list traverse  
+crash> list -s rwsem_waiter.task,type -h $addr  
+```  
+Check value in struct fields.  
+```bash  
+crash> struct task_struct.comm,pid,mm,parent,real_parent ffff000006a5ea00 -x  
+  comm = "bash\000\000\000)\000\000\000\000\000\000\000",  
+  pid = 0x1fd,  
+  mm = 0xffff000002857840,  
+  parent = 0xffff000002780000,  
+  real_parent = 0xffff000002780000,  
+crash>   
+# task_struct addr will be printed in ps command  
+crash> ps | grep systemd                                                      
+[ 7358.357537] hrtimer: interrupt took 13919589 ns  
+      1      0   1  ffff000001eaea00  IN   0.0  165216   9376  systemd  
+    124      1   2  ffff0000024c0d40  IN   0.0   21636   6172  systemd-journal  
+    139      1   1  ffff000001f9a7c0  IN   0.0   17896   4412  systemd-udevd  
+    286      1   0  ffff000005ec8d40  IN   0.0   15012   6364  systemd-logind  
+    476      1   3  ffff000004438000  IN   0.0   16764   8228  systemd  
+    477      1   0  ffff000004438d40  IN   0.0   88896   6312  systemd-timesyn  
+crash> struct task_struct.mm ffff000001eaea00 -x  
+  mm = 0xffff000003f803c0,  
+# We can see owner field points to task_struct addr  
+crash> struct mm_struct.owner 0xffff000003f803c0 -x  
+    owner = 0xffff000001eaea00,
+```  
 ```bash
 $ objdump -dSl vmlinux.elf > output.log
 ```
@@ -425,7 +477,7 @@ If we don’t have vmlinux.elf, we can generate it via:
 ```bash
 $ vmlinux-to-elf vmlinux vmlinux.elf
 ```
-[marin-m/vmlinux-to-elf: A tool to recover a fully analyzable .ELF from a raw kernel, through extracting the kernel symbol table (kallsyms) (github.com)](https://github.com/marin-m/vmlinux-to-elf)
+[marin-m/vmlinux-to-elf: A tool to recover a fully analyzable .ELF from a raw kernel, through extracting the kernel symbol table (kallsyms) (github.com)](https://github.com/marin-m/vmlinux-to-elf)  
 ![alt text](images/ftrace_oops_common_reasons.png)  
 We can also use script decode_stacktrace.sh in linux kernel repo, to parse it.  
 Before:  
@@ -493,7 +545,7 @@ Similarly we can also enable preemptoff tracer, or preemptirqoff tracer, to see 
 # 10. Sanitizers
 ## KASAN  
 KASAN (Kernel Address Sanitizer)  
-To enable KASAN, configure the kernel with: CONFIG_KASAN=y, and choose CONFIG_KASAN_HW_TAGS. It is the mode intended to be used as an in-field memory bug detector or as a security mitigation. This mode only works on arm64 CPUs that support MTE (Memory Tagging Extension), but it has low memory and performance overheads and thus can be used in production.  
+To enable KASAN, configure the kernel with: CONFIG_KASAN=y, and choose CONFIG_KASAN_HW_TAGS. It is the mode intended to be used as an in-field memory bug detector or as a security mitigation. This mode only works on arm64 CPUs that support MTE (Memory Tagging Extension), as it has low memory and performance overheads, it can be used in production.  
 ![alt text](images/kasan_areas.png)  
 Sample log:  
 ![alt text](images/ksan_detected_errors.png)  
